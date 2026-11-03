@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { AddSpend } from './AddSpend'
 import {
+  categorySpends,
   categoryStatus,
   formatMoney,
   monthKey,
@@ -8,7 +9,7 @@ import {
   newId,
   previousNames,
   shiftMonth,
-  spendsInMonth,
+  spentInMonth,
   type Category,
 } from './budget'
 import { CategoryDetail } from './CategoryDetail'
@@ -20,7 +21,7 @@ import { CategoryCard } from './ui'
 type View =
   | { kind: 'add'; categoryId: string }
   | { kind: 'detail'; categoryId: string }
-  | { kind: 'edit'; categoryId: string | null }
+  | { kind: 'edit'; categoryId: string | null; longTerm?: boolean }
   | { kind: 'settings' }
 
 export default function App() {
@@ -52,7 +53,10 @@ export default function App() {
     () => data.categories.map((cat) => ({ cat, status: categoryStatus(cat, data.spends, month) })),
     [data, month],
   )
-  const totals = statuses.reduce(
+  const monthly = statuses.filter(({ cat }) => !cat.longTerm)
+  const longTerm = statuses.filter(({ cat }) => cat.longTerm)
+  const longTermSpentThisMonth = spentInMonth(data.spends, new Set(longTerm.map(({ cat }) => cat.id)), month)
+  const totals = monthly.reduce(
     (t, { status }) => ({
       spent: t.spent + status.spent,
       available: t.available + status.available,
@@ -124,7 +128,7 @@ export default function App() {
           <CategoryDetail
             cat={cat}
             status={statusOf(cat)}
-            spends={spendsInMonth(data.spends, cat.id, month)}
+            spends={categorySpends(data.spends, cat, month)}
             month={month}
             currency={data.currency}
             onBack={pop}
@@ -138,6 +142,7 @@ export default function App() {
         return (
           <CategoryEditor
             cat={view.categoryId ? (findCategory(view.categoryId) ?? null) : null}
+            longTerm={view.longTerm === true}
             currentMonth={currentMonth}
             currency={data.currency}
             onCancel={pop}
@@ -152,7 +157,7 @@ export default function App() {
             onBack={pop}
             onCurrency={(currency) => setData((d) => ({ ...d, currency }))}
             onImport={(imported) => {
-              setData({ ...imported, version: 1, currency: imported.currency ?? data.currency })
+              setData(imported)
               setStack([])
             }}
           />
@@ -185,7 +190,7 @@ export default function App() {
       <section className="card summary">
         <div className="sub">{isCurrent ? 'Spent this month' : `Spent in ${monthLabel(month, 'short')}`}</div>
         <div className="big">{fmt(totals.spent)}</div>
-        {data.categories.length > 0 && (
+        {monthly.length > 0 && (
           <div className="sub">
             of {fmt(totals.available)} ·{' '}
             <span className={totalLeft < 0 ? 'danger' : ''}>
@@ -196,6 +201,11 @@ export default function App() {
         {totals.rollover > 0 && (
           <div className="rollover-total">↻ Includes {fmt(totals.rollover)} extra rolled over from last month</div>
         )}
+        {longTermSpentThisMonth > 0 && (
+          <div className="sub long-term-total">
+            + {fmt(longTermSpentThisMonth)} from long-term budgets
+          </div>
+        )}
       </section>
 
       {!isCurrent && (
@@ -205,7 +215,7 @@ export default function App() {
       )}
 
       <section className="list">
-        {statuses.map(({ cat, status }) => (
+        {monthly.map(({ cat, status }) => (
           <CategoryCard
             key={cat.id}
             cat={cat}
@@ -221,6 +231,27 @@ export default function App() {
         )}
         <button className="new-cat" onClick={() => push({ kind: 'edit', categoryId: null })}>
           + New category
+        </button>
+      </section>
+
+      <h3 className="section-title long-term-title">Long-term budgets</h3>
+      <section className="list long-term">
+        {longTerm.map(({ cat, status }) => (
+          <CategoryCard
+            key={cat.id}
+            cat={cat}
+            status={status}
+            month={month}
+            currency={data.currency}
+            onAdd={() => push({ kind: 'add', categoryId: cat.id })}
+            onDetails={() => push({ kind: 'detail', categoryId: cat.id })}
+          />
+        ))}
+        {longTerm.length === 0 && (
+          <p className="hint">Budgets that never reset, like Christmas or a trip. Spends count toward one total.</p>
+        )}
+        <button className="new-cat" onClick={() => push({ kind: 'edit', categoryId: null, longTerm: true })}>
+          + New long-term budget
         </button>
       </section>
 

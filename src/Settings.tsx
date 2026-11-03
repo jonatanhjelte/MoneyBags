@@ -1,6 +1,6 @@
 import { useRef, type ChangeEvent } from 'react'
 import type { Data } from './budget'
-import { exportData, isData } from './store'
+import { exportData, isData, normalizeData } from './store'
 import { Sheet } from './ui'
 
 type Props = {
@@ -21,7 +21,7 @@ export function Settings({ data, onBack, onCurrency, onImport }: Props) {
       const parsed = JSON.parse(await file.text())
       if (!isData(parsed)) throw new Error('not a backup')
       const summary = `${parsed.categories.length} categories, ${parsed.spends.length} spends`
-      if (confirm(`Replace everything in the app with this backup (${summary})?`)) onImport(parsed)
+      if (confirm(`Replace everything in the app with this backup (${summary})?`)) onImport(normalizeData(parsed))
     } catch {
       alert('That file is not a MoneyBags backup.')
     }

@@ -16,6 +16,7 @@ type Props = {
 export function CategoryDetail({ cat, status, spends, month, currency, onBack, onEdit, onAdd, onDeleteSpend }: Props) {
   const fmt = (n: number) => formatMoney(n, currency)
   const over = status.remaining < 0
+  const longTerm = cat.longTerm === true
 
   const deleteSpend = (s: Spend) => {
     if (confirm(`Delete ${fmt(s.amount)}${s.name ? ` (${s.name})` : ''}?`)) onDeleteSpend(s.id)
@@ -38,24 +39,26 @@ export function CategoryDetail({ cat, status, spends, month, currency, onBack, o
       <div className="detail-head">
         <CategoryIcon icon={cat.icon} color={cat.color} size={64} />
         <div className="big">{fmt(status.spent)}</div>
-        <div className="sub">spent in {monthLabel(month)}</div>
+        <div className="sub">{longTerm ? 'spent in total' : `spent in ${monthLabel(month)}`}</div>
       </div>
 
       <div className="card">
         <div className="row">
-          <span>Monthly max</span>
+          <span>{longTerm ? 'Total budget' : 'Monthly max'}</span>
           <span>{fmt(status.limit)}</span>
         </div>
-        {(cat.rolloverSince !== null || status.rollover > 0) && (
+        {!longTerm && (cat.rolloverSince !== null || status.rollover > 0) && (
           <div className="row rollover-row" style={{ color: cat.color }}>
             <span>↻ Rolled over from {monthLabel(shiftMonth(month, -1), 'short')}</span>
             <span>+{fmt(status.rollover)}</span>
           </div>
         )}
-        <div className="row strong">
-          <span>Available</span>
-          <span>{fmt(status.available)}</span>
-        </div>
+        {!longTerm && (
+          <div className="row strong">
+            <span>Available</span>
+            <span>{fmt(status.available)}</span>
+          </div>
+        )}
         <div className="row">
           <span>Spent</span>
           <span>−{fmt(status.spent)}</span>
@@ -78,7 +81,7 @@ export function CategoryDetail({ cat, status, spends, month, currency, onBack, o
         + Add spend
       </button>
 
-      <h3 className="section-title">Spends in {monthLabel(month, 'short')}</h3>
+      <h3 className="section-title">{longTerm ? 'All spends' : `Spends in ${monthLabel(month, 'short')}`}</h3>
       {spends.length === 0 ? (
         <p className="hint">Nothing spent yet.</p>
       ) : (
@@ -89,7 +92,11 @@ export function CategoryDetail({ cat, status, spends, month, currency, onBack, o
                 <span>
                   <span className={s.name ? '' : 'muted'}>{s.name || 'No name'}</span>
                   <span className="sub block">
-                    {new Date(s.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                    {new Date(s.date).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                      ...(longTerm ? { year: 'numeric' } : {}),
+                    })}
                   </span>
                 </span>
                 <span>{fmt(s.amount)}</span>

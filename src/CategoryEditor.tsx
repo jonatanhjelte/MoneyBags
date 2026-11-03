@@ -16,6 +16,8 @@ const COLORS = [
 
 type Props = {
   cat: Category | null
+  /** Only used when creating; existing categories keep their type. */
+  longTerm: boolean
   currentMonth: string
   currency: string
   onCancel: () => void
@@ -23,9 +25,12 @@ type Props = {
   onDelete: (id: string) => void
 }
 
-export function CategoryEditor({ cat, currentMonth, currency, onCancel, onSave, onDelete }: Props) {
+export function CategoryEditor({ cat, longTerm: newLongTerm, currentMonth, currency, onCancel, onSave, onDelete }: Props) {
+  const longTerm = cat ? cat.longTerm === true : newLongTerm
   const [name, setName] = useState(cat?.name ?? '')
-  const [limitText, setLimitText] = useState(cat ? String(limitFor(cat, currentMonth)) : '')
+  const [limitText, setLimitText] = useState(
+    cat ? String(limitFor(cat, longTerm ? '9999-12' : currentMonth)) : '',
+  )
   const [rollover, setRollover] = useState(cat ? cat.rolloverSince !== null : false)
   const [icon, setIcon] = useState(cat?.icon ?? ICONS[0])
   const [color, setColor] = useState(cat?.color ?? COLORS[3])
@@ -33,15 +38,19 @@ export function CategoryEditor({ cat, currentMonth, currency, onCancel, onSave, 
 
   const save = () => {
     const limit = parseAmount(limitText)
-    const limits =
-      cat && limitFor(cat, currentMonth) === limit ? cat.limits : { ...cat?.limits, [currentMonth]: limit }
+    const limits = longTerm
+      ? { [currentMonth]: limit }
+      : cat && limitFor(cat, currentMonth) === limit
+        ? cat.limits
+        : { ...cat?.limits, [currentMonth]: limit }
     onSave({
       id: cat?.id ?? newId(),
       name: name.trim(),
       icon,
       color,
       limits,
-      rolloverSince: rollover ? (cat?.rolloverSince ?? currentMonth) : null,
+      rolloverSince: rollover && !longTerm ? (cat?.rolloverSince ?? currentMonth) : null,
+      longTerm,
     })
   }
 
@@ -51,7 +60,7 @@ export function CategoryEditor({ cat, currentMonth, currency, onCancel, onSave, 
 
   return (
     <Sheet
-      title={cat ? 'Edit category' : 'New category'}
+      title={cat ? 'Edit category' : longTerm ? 'New long-term budget' : 'New category'}
       left={
         <button className="link" onClick={onCancel}>
           Cancel
@@ -72,13 +81,13 @@ export function CategoryEditor({ cat, currentMonth, currency, onCancel, onSave, 
           <span>Name</span>
           <input
             className="inline-input"
-            placeholder="e.g. Groceries"
+            placeholder={longTerm ? 'e.g. Christmas' : 'e.g. Groceries'}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </label>
         <label className="row">
-          <span>Monthly max</span>
+          <span>{longTerm ? 'Total budget' : 'Monthly max'}</span>
           <span className="inline-money">
             <input
               className="inline-input"
@@ -90,21 +99,25 @@ export function CategoryEditor({ cat, currentMonth, currency, onCancel, onSave, 
             <span className="muted">{currency}</span>
           </span>
         </label>
-        <label className="row">
-          <span>Roll over unspent money</span>
-          <input
-            type="checkbox"
-            className="switch"
-            checked={rollover}
-            onChange={(e) => setRollover(e.target.checked)}
-          />
-        </label>
+        {!longTerm && (
+          <label className="row">
+            <span>Roll over unspent money</span>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={rollover}
+              onChange={(e) => setRollover(e.target.checked)}
+            />
+          </label>
+        )}
       </div>
       <p className="hint">
-        {rollover
-          ? "Whatever you don't spend this month is added to next month's max."
-          : 'Each month starts fresh at the monthly max.'}
-        {cat && ' Changing the max applies from this month onward.'}
+        {longTerm
+          ? 'Never resets. Every spend you add counts toward the total budget, no matter the month.'
+          : rollover
+            ? "Whatever you don't spend this month is added to next month's max."
+            : 'Each month starts fresh at the monthly max.'}
+        {cat && !longTerm && ' Changing the max applies from this month onward.'}
       </p>
 
       <h3 className="section-title">Icon</h3>

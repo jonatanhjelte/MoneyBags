@@ -12,10 +12,27 @@ export function isData(value: unknown): value is Data {
   return !!v && typeof v === 'object' && Array.isArray(v.categories) && Array.isArray(v.spends)
 }
 
+/** Fills in defaults for fields that older saves and backups don't have. */
+export function normalizeData(raw: Data): Data {
+  return {
+    ...emptyData(),
+    ...raw,
+    version: 1,
+    currency: typeof raw.currency === 'string' ? raw.currency : emptyData().currency,
+    categories: raw.categories.map((c) => ({
+      ...c,
+      limits: c.limits ?? {},
+      rolloverSince: c.rolloverSince ?? null,
+      longTerm: c.longTerm === true,
+    })),
+    spends: raw.spends.map((s) => ({ ...s, name: s.name ?? '' })),
+  }
+}
+
 function load(): Data {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
-    if (isData(parsed)) return { ...emptyData(), ...parsed }
+    if (isData(parsed)) return normalizeData(parsed)
   } catch {
     // fall through to empty data
   }

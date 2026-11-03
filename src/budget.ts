@@ -3,10 +3,12 @@ export type Category = {
   name: string
   icon: string
   color: string
-  /** Monthly max, keyed by the month ("YYYY-MM") the value takes effect from. */
+  /** Monthly max (or total budget for long-term), keyed by the month ("YYYY-MM") the value takes effect from. */
   limits: Record<string, number>
   /** Month rollover was switched on. Leftovers from this month onward carry forward. */
   rolloverSince: string | null
+  /** Long-term budgets never reset: every spend ever made counts against one total. */
+  longTerm?: boolean
 }
 
 export type Spend = {
@@ -18,6 +20,10 @@ export type Spend = {
   date: string
 }
 
+/**
+ * Saved as-is on the phone and in backups. Only ever add optional fields
+ * (with defaults in normalizeData) so older saves keep loading.
+ */
 export type Data = {
   version: 1
   currency: string
@@ -70,7 +76,13 @@ function spentPerMonth(spends: Spend[], categoryId: string): Map<string, number>
   return map
 }
 
+/** Monthly categories: status for `month`. Long-term budgets: all-time status. */
 export function categoryStatus(cat: Category, spends: Spend[], month: string): MonthStatus {
+  if (cat.longTerm) {
+    const limit = limitFor(cat, '9999-12')
+    const spent = spends.reduce((sum, s) => (s.categoryId === cat.id ? sum + s.amount : sum), 0)
+    return { limit, rollover: 0, available: limit, spent, remaining: limit - spent }
+  }
   const spentMap = spentPerMonth(spends, cat.id)
   let rollover = 0
   if (cat.rolloverSince) {
@@ -84,10 +96,18 @@ export function categoryStatus(cat: Category, spends: Spend[], month: string): M
   return { limit, rollover, available, spent, remaining: available - spent }
 }
 
-export function spendsInMonth(spends: Spend[], categoryId: string, month: string): Spend[] {
+/** Spends in `month` for monthly categories, all spends for long-term budgets. Newest first. */
+export function categorySpends(spends: Spend[], cat: Category, month: string): Spend[] {
   return spends
-    .filter((s) => s.categoryId === categoryId && monthKey(new Date(s.date)) === month)
+    .filter((s) => s.categoryId === cat.id && (cat.longTerm || monthKey(new Date(s.date)) === month))
     .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+export function spentInMonth(spends: Spend[], categoryIds: Set<string>, month: string): number {
+  return spends.reduce(
+    (sum, s) => (categoryIds.has(s.categoryId) && monthKey(new Date(s.date)) === month ? sum + s.amount : sum),
+    0,
+  )
 }
 
 /** Previously used spend names for a category, most used first, then most recent. */

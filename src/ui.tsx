@@ -50,7 +50,10 @@ export function CategoryCard({ cat, status, month, currency, onAdd, onDetails }:
             <span className={over ? 'danger' : ''}>
               {over ? `${fmt(-status.remaining)} over` : `${fmt(status.remaining)} left`}
             </span>
-            <span>of {fmt(status.available)}</span>
+            <span>
+              of {fmt(status.available)}
+              {cat.longTerm ? ' total' : ''}
+            </span>
           </div>
           <Bar status={status} color={cat.color} />
           {status.rollover > 0 && (

@@ -173,6 +173,18 @@ input {
   color: var(--accent);
 }
 
+.long-term-total {
+  margin-top: 6px;
+}
+
+.long-term-title {
+  margin-top: 32px;
+}
+
+.long-term .hint {
+  margin-top: 0;
+}
+
 /* Category cards */
 
 .list {
